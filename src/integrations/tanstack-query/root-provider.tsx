@@ -1,10 +1,25 @@
-import { QueryClient } from '@tanstack/react-query'
+import {
+  QueryClient,
+  QueryClientProvider as ReactQueryClientProvider,
+} from '@tanstack/react-query'
+import React, { useState } from 'react'
 
-export function getContext() {
-  const queryClient = new QueryClient()
-
-  return {
-    queryClient,
-  }
+const QueryClientProvider = ({ children }: { children: React.ReactNode }) => {
+  const [queryClient] = useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            refetchOnWindowFocus: false,
+          },
+        },
+      }),
+  )
+  return (
+    <ReactQueryClientProvider client={queryClient}>
+      {children}
+    </ReactQueryClientProvider>
+  )
 }
-export default function TanstackQueryProvider() {}
+
+export default QueryClientProvider
