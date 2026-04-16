@@ -1,4 +1,13 @@
 import { getSession } from '@/lib/auth.functions'
+import {
+  LAYOUT_OPTIONS,
+  PresentationListSection,
+  SLIDE_STYLES,
+  TONE_OPTIONS,
+  presentationQueryKeys,
+} from '#/features/presentations'
+import { createPresentation } from '#/features/presentations/actions/presentation-mutations'
+import { listPresentations } from '#/features/presentations/api/presentation-queries'
 import { Button } from '#/components/ui/button'
 import { Label } from '#/components/ui/label'
 import {
@@ -10,31 +19,11 @@ import {
 } from '#/components/ui/select'
 import { Slider } from '#/components/ui/slider'
 import { Textarea } from '#/components/ui/textarea'
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { Sparkles, Wand2 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
-
-const SLIDE_STYLES = [
-  { value: 'minimal', label: 'Minimal' },
-  { value: 'professional', label: 'Professional' },
-  { value: 'creative', label: 'Creative' },
-  { value: 'bold', label: 'Bold' },
-] as const
-
-const TONE_OPTIONS = [
-  { value: 'formal', label: 'Formal' },
-  { value: 'casual', label: 'Casual' },
-  { value: 'persuasive', label: 'Persuasive' },
-  { value: 'informative', label: 'Informative' },
-] as const
-
-const LAYOUT_OPTIONS = [
-  { value: 'text-heavy', label: 'Text Heavy' },
-  { value: 'visual', label: 'Visual Focus' },
-  { value: 'balanced', label: 'Balanced' },
-  { value: 'bullet-points', label: 'Bullet Points' },
-] as const
 
 const TEMPLATES = [
   {
@@ -214,32 +203,59 @@ export const Route = createFileRoute('/')({
 
 function HomePage() {
   const _context = Route.useRouteContext()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [content, setContent] = useState('')
   const [slideCount, setSlideCount] = useState([8])
   const [style, setStyle] = useState('minimal')
   const [tone, setTone] = useState('professional')
   const [layout, setLayout] = useState('balanced')
-  const [isGenerating, setIsGenerating] = useState(false)
 
-  const handleGenerate = async () => {
+  const { data: presentations = [], isPending: listPending } = useQuery({
+    queryKey: presentationQueryKeys.list(),
+    queryFn: () => listPresentations(),
+  })
+
+  const createMut = useMutation({
+    mutationFn: () =>
+      createPresentation({
+        data: {
+          prompt: content.trim(),
+          slideCount: slideCount[0],
+          style: style as (typeof SLIDE_STYLES)[number]['value'],
+          tone: tone as (typeof TONE_OPTIONS)[number]['value'],
+          layout: layout as (typeof LAYOUT_OPTIONS)[number]['value'],
+        },
+      }),
+    onSuccess: (presentation) => {
+      toast.success('Presentation created')
+      queryClient.invalidateQueries({ queryKey: presentationQueryKeys.list() })
+      navigate({
+        to: '/presentations/$presentationId',
+        params: { presentationId: presentation.id },
+      })
+    },
+    onError: (e) => {
+      toast.error(e instanceof Error ? e.message : 'Could not create presentation')
+    },
+  })
+
+  const handleGenerate = () => {
     if (!content.trim()) {
       toast.error('Please enter your content first')
       return
     }
-
-    setIsGenerating(true)
-    toast.message('Generating your presentation...')
-
-    // Placeholder for actual generation
-    setTimeout(() => {
-      setIsGenerating(false)
-      toast.success('Presentation generated!')
-    }, 2000)
+    createMut.mutate()
   }
 
   return (
     <main className="min-h-screen pt-24 pb-12 px-4">
       <div className="max-w-4xl mx-auto">
+        <PresentationListSection
+          presentations={presentations}
+          isPending={listPending}
+        />
+
         {/* Header */}
         <div className="text-center mb-10">
           <h1 className="text-4xl md:text-5xl font-bold mb-3">
@@ -341,13 +357,13 @@ function HomePage() {
             <Button
               size="lg"
               onClick={handleGenerate}
-              disabled={isGenerating || !content.trim()}
+              disabled={createMut.isPending || !content.trim()}
               className="rounded-xl px-8 gap-2 font-semibold"
             >
-              {isGenerating ? (
+              {createMut.isPending ? (
                 <>
                   <Sparkles className="size-5 animate-pulse" />
-                  Generating...
+                  Creating…
                 </>
               ) : (
                 <>

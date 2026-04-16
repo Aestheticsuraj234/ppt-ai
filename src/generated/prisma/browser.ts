@@ -28,6 +28,16 @@ export type Todo = Prisma.TodoModel
  */
 export type User = Prisma.UserModel
 /**
+ * Model Presentation
+ * 
+ */
+export type Presentation = Prisma.PresentationModel
+/**
+ * Model Slide
+ * 
+ */
+export type Slide = Prisma.SlideModel
+/**
  * Model Session
  * 
  */
