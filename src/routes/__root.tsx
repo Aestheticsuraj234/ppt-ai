@@ -1,26 +1,21 @@
 import {
   HeadContent,
+  Outlet,
   Scripts,
   createRootRouteWithContext,
 } from '@tanstack/react-router'
-import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
-import { TanStackDevtools } from '@tanstack/react-devtools'
-import Footer from '../components/Footer'
-import Header from '../components/Header'
 
-import TanStackQueryDevtools from '../integrations/tanstack-query/devtools'
+import Navbar from '../components/navbar'
 
 import appCss from '../styles.css?url'
 
 import type { QueryClient } from '@tanstack/react-query'
-import { ThemeProvider } from '#/providers/theme-provider'
 import QueryClientProvider from '#/integrations/tanstack-query/root-provider'
+import { Toaster } from '#/components/ui/sonner'
 
 interface MyRouterContext {
   queryClient: QueryClient
 }
-
-
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
   head: () => ({
@@ -33,7 +28,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'TanStack Start Starter',
+        title: 'PPT.ai - Generate presentations from text',
       },
     ],
     links: [
@@ -43,38 +38,31 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       },
     ],
   }),
+  component: RootLayout,
   shellComponent: RootDocument,
 })
 
+function RootLayout() {
+  return (
+    <div className="min-h-svh">
+      <Navbar />
+      <Outlet />
+    </div>
+  )
+}
+
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className="dark">
       <head>
-       
         <HeadContent />
       </head>
-      <body className="font-sans antialiased [overflow-wrap:anywhere] selection:bg-[rgba(79,184,178,0.24)]">
-        <ThemeProvider>
-          <QueryClientProvider>
-        <Header />
-        {children}
-        <Footer />
-        <TanStackDevtools
-          config={{
-            position: 'bottom-right',
-          }}
-          plugins={[
-            {
-              name: 'Tanstack Router',
-              render: <TanStackRouterDevtoolsPanel />,
-            },
-            TanStackQueryDevtools,
-          ]}
-        />
-        <Scripts />
-
+      <body className="font-sans antialiased bg-background text-foreground selection:bg-primary/20">
+        <QueryClientProvider>
+          {children}
+          <Toaster closeButton position="top-center" richColors />
+          <Scripts />
         </QueryClientProvider>
-        </ThemeProvider>
       </body>
     </html>
   )
