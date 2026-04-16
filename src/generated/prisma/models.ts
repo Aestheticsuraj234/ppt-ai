@@ -10,6 +10,8 @@
  */
 export type * from './models/Todo.ts'
 export type * from './models/User.ts'
+export type * from './models/Presentation.ts'
+export type * from './models/Slide.ts'
 export type * from './models/Session.ts'
 export type * from './models/Account.ts'
 export type * from './models/Verification.ts'

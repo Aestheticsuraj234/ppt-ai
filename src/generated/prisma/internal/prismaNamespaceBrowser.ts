@@ -53,6 +53,8 @@ export const AnyNull = runtime.AnyNull
 export const ModelName = {
   Todo: 'Todo',
   User: 'User',
+  Presentation: 'Presentation',
+  Slide: 'Slide',
   Session: 'Session',
   Account: 'Account',
   Verification: 'Verification'
@@ -94,6 +96,39 @@ export const UserScalarFieldEnum = {
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const PresentationScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  title: 'title',
+  prompt: 'prompt',
+  slideCount: 'slideCount',
+  style: 'style',
+  tone: 'tone',
+  layout: 'layout',
+  status: 'status',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PresentationScalarFieldEnum = (typeof PresentationScalarFieldEnum)[keyof typeof PresentationScalarFieldEnum]
+
+
+export const SlideScalarFieldEnum = {
+  id: 'id',
+  presentationId: 'presentationId',
+  order: 'order',
+  title: 'title',
+  content: 'content',
+  notes: 'notes',
+  imageUrl: 'imageUrl',
+  imagePrompt: 'imagePrompt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type SlideScalarFieldEnum = (typeof SlideScalarFieldEnum)[keyof typeof SlideScalarFieldEnum]
 
 
 export const SessionScalarFieldEnum = {
