@@ -37,12 +37,17 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
+  Download,
+  Maximize,
+  Play,
   RefreshCw,
   Save,
   Trash2,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { SlideshowModal } from '#/features/presentations/components/slideshow-modal'
+import { exportToPptx } from '#/features/presentations/lib/export-pptx'
 
 export const Route = createFileRoute('/presentations/$presentationId')({
   beforeLoad: async ({ location }) => {
@@ -82,6 +87,9 @@ function PresentationDetailPage() {
   const [layout, setLayout] = useState('balanced')
   const [activeSlideIndex, setActiveSlideIndex] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [showSlideshow, setShowSlideshow] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
 
   useEffect(() => {
     if (!data) return
@@ -145,6 +153,47 @@ function PresentationDetailPage() {
       toast.error(e instanceof Error ? e.message : 'Could not delete')
     },
   })
+
+  const handleFullscreen = useCallback(async () => {
+    const elem = document.getElementById('slide-preview-container')
+    if (!elem) return
+
+    if (!document.fullscreenElement) {
+      await elem.requestFullscreen()
+      setIsFullscreen(true)
+    } else {
+      await document.exitFullscreen()
+      setIsFullscreen(false)
+    }
+  }, [])
+
+  const handleExportPptx = useCallback(async () => {
+    if (!data) return
+    const slidesToExport = data.slides ?? []
+    if (slidesToExport.length === 0) return
+
+    setIsExporting(true)
+    try {
+      const filename = await exportToPptx({
+        title: data.title,
+        slides: slidesToExport,
+      })
+      toast.success(`Exported as ${filename}`)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Export failed')
+    } finally {
+      setIsExporting(false)
+    }
+  }, [data])
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement)
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () =>
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [])
 
   if (isPending) {
     return (
@@ -219,7 +268,32 @@ function PresentationDetailPage() {
                   {slides.length} slides
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
+                {slides.length > 0 && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl gap-1"
+                      onClick={() => setShowSlideshow(true)}
+                    >
+                      <Play className="size-4" />
+                      <span className="hidden sm:inline">Slideshow</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="rounded-xl gap-1"
+                      onClick={handleExportPptx}
+                      disabled={isExporting}
+                    >
+                      <Download className="size-4" />
+                      <span className="hidden sm:inline">
+                        {isExporting ? 'Exporting…' : 'Export'}
+                      </span>
+                    </Button>
+                  </>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
@@ -230,7 +304,9 @@ function PresentationDetailPage() {
                   <RefreshCw
                     className={`size-4 ${isGenerating ? 'animate-spin' : ''}`}
                   />
-                  {isGenerating ? 'Generating…' : 'Regenerate'}
+                  <span className="hidden sm:inline">
+                    {isGenerating ? 'Generating…' : 'Regenerate'}
+                  </span>
                 </Button>
                 <Button
                   variant="ghost"
@@ -366,7 +442,19 @@ function PresentationDetailPage() {
 
             {activeSlide && (
               <div className="space-y-3">
-                <SlidePreview slide={activeSlide} />
+                <div id="slide-preview-container" className="relative group">
+                  <SlidePreview slide={activeSlide} isFullscreen={isFullscreen} />
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className={`absolute top-3 right-3 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity ${
+                      isFullscreen ? 'opacity-100' : ''
+                    }`}
+                    onClick={handleFullscreen}
+                  >
+                    <Maximize className="size-4" />
+                  </Button>
+                </div>
                 <div className="flex items-center justify-between">
                   <Button
                     variant="outline"
@@ -432,9 +520,11 @@ function PresentationDetailPage() {
           </div>
 
           {slides.length > 0 && (
-            <div className="lg:w-72 xl:w-80 space-y-3">
-              <h2 className="font-medium text-sm px-1">Slides</h2>
-              <div className="space-y-3 max-h-[calc(100vh-12rem)] overflow-y-auto pr-1">
+            <aside className="lg:w-80 xl:w-96 flex flex-col">
+              <h2 className="font-medium text-sm px-2 pb-3 text-muted-foreground">
+                Slides
+              </h2>
+              <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent pr-2 -mr-2 space-y-4 max-h-[calc(100vh-14rem)]">
                 {slides.map((slide, i) => (
                   <SlideCard
                     key={slide.id}
@@ -444,10 +534,18 @@ function PresentationDetailPage() {
                   />
                 ))}
               </div>
-            </div>
+            </aside>
           )}
         </div>
       </div>
+
+      {showSlideshow && (
+        <SlideshowModal
+          slides={slides}
+          initialIndex={activeSlideIndex}
+          onClose={() => setShowSlideshow(false)}
+        />
+      )}
     </main>
   )
 }

@@ -1,11 +1,29 @@
-import { generateObject } from 'ai'
+import { Output, generateText } from 'ai'
 import { google } from '@ai-sdk/google'
 import { z } from 'zod'
 
 import { prisma } from '#/db'
-import { uploadImageFromUrl } from '#/lib/imagekit'
 
 import { inngest } from './client'
+
+// ---------------------------------------------------------------------------
+// Image Generation
+// ---------------------------------------------------------------------------
+
+function buildImageKitUrl(prompt: string, filename: string): string {
+  const baseUrl = process.env.IMAGEKIT_BASE_URL!
+  const sanitizedPrompt = prompt
+    .replace(/[^\w\s-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 100)
+
+  return `${baseUrl}/ik-genimg-prompt-${encodeURIComponent(sanitizedPrompt)}/${filename}.jpg?tr=w-1280,h-720`
+}
+
+// ---------------------------------------------------------------------------
+// Schemas
+// ---------------------------------------------------------------------------
 
 const slideSchema = z.object({
   title: z.string().describe('Slide title'),
@@ -14,7 +32,7 @@ const slideSchema = z.object({
   imagePrompt: z
     .string()
     .describe(
-      'A concise prompt to generate an illustration for this slide (professional, clean style)',
+      'A concise prompt to generate an illustration for this slide (professional, clean style, no text in image)',
     ),
 })
 
@@ -62,14 +80,14 @@ Guidelines:
 - For imagePrompt, describe a professional illustration that complements the slide (no text in images)
 `
 
-      const result = await generateObject({
-        model: google('gemini-2.0-flash'),
-        schema: slidesResponseSchema,
+      const result = await generateText({
+        model: google('gemini-2.5-flash'),
+        output: Output.object({ schema: slidesResponseSchema }),
         system: systemPrompt,
         prompt: presentation.prompt,
       })
 
-      return result.object
+      return result.output
     })
 
     await step.run('delete-old-slides', async () => {
@@ -78,49 +96,19 @@ Guidelines:
       })
     })
 
-    const createdSlides = await step.run('create-slides', async () => {
-      const created = await prisma.slide.createManyAndReturn({
-        data: slides.map((s, i) => ({
-          presentationId,
-          order: i,
-          title: s.title,
-          content: s.content,
-          notes: s.notes ?? null,
-          imagePrompt: s.imagePrompt,
-        })),
-      })
-      return created
+    await step.run('create-slides', async () => {
+      const data = slides.map((s, i) => ({
+        presentationId,
+        order: i,
+        title: s.title,
+        content: s.content,
+        notes: s.notes ?? null,
+        imagePrompt: s.imagePrompt,
+        imageUrl: buildImageKitUrl(s.imagePrompt, `slide-${presentationId}-${i}`),
+      }))
+
+      await prisma.slide.createMany({ data })
     })
-
-    for (const slide of createdSlides) {
-      await step.run(`generate-image-${slide.id}`, async () => {
-        if (!slide.imagePrompt) return
-
-        const imageGenPrompt = `Professional presentation slide illustration: ${slide.imagePrompt}. Clean, modern, minimal style with soft gradients. No text.`
-
-        const response = await fetch(
-          `https://image.pollinations.ai/prompt/${encodeURIComponent(imageGenPrompt)}?width=1024&height=576&nologo=true&model=flux`,
-        )
-
-        if (!response.ok) {
-          console.error('Image generation failed for slide', slide.id)
-          return
-        }
-
-        const imageUrl = response.url
-
-        const uploadedUrl = await uploadImageFromUrl(
-          imageUrl,
-          `slide-${slide.id}.png`,
-          `presentations/${presentationId}`,
-        )
-
-        await prisma.slide.update({
-          where: { id: slide.id },
-          data: { imageUrl: uploadedUrl },
-        })
-      })
-    }
 
     await step.run('mark-completed', async () => {
       await prisma.presentation.update({
