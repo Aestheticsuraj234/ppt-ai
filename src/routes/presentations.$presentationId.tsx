@@ -3,18 +3,24 @@ import {
   LAYOUT_OPTIONS,
   SLIDE_STYLES,
   TONE_OPTIONS,
-  presentationQueryKeys,
   presentationThumbnailUrl,
+  useFullscreen,
+  usePresentationDetail,
 } from '#/features/presentations'
-import {
-  deletePresentation,
-  regeneratePresentation,
-  updatePresentation,
-} from '#/features/presentations/actions/presentation-mutations'
-import { getPresentationWithSlides } from '#/features/presentations/api/presentation-queries'
 import { GenerationStatus } from '#/features/presentations/components/generation-status'
 import { SlideCard } from '#/features/presentations/components/slide-card'
 import { SlidePreview } from '#/features/presentations/components/slide-preview'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '#/components/ui/alert-dialog'
 import { Button } from '#/components/ui/button'
 import { Label } from '#/components/ui/label'
 import {
@@ -32,7 +38,6 @@ import {
   redirect,
   useNavigate,
 } from '@tanstack/react-router'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowLeft,
   ChevronLeft,
@@ -44,7 +49,7 @@ import {
   Save,
   Trash2,
 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import { SlideshowModal } from '#/features/presentations/components/slideshow-modal'
 import { exportToPptx } from '#/features/presentations/lib/export-pptx'
@@ -68,108 +73,33 @@ export const Route = createFileRoute('/presentations/$presentationId')({
 function PresentationDetailPage() {
   const { presentationId } = Route.useParams()
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
-
-  const { data, isPending, isError, error } = useQuery({
-    queryKey: presentationQueryKeys.detail(presentationId),
-    queryFn: () => getPresentationWithSlides({ data: { id: presentationId } }),
-    refetchInterval: (query) => {
-      const status = query.state.data?.status
-      return status === 'GENERATING' ? 3000 : false
-    },
-  })
-
-  const [title, setTitle] = useState('')
-  const [prompt, setPrompt] = useState('')
-  const [slideCount, setSlideCount] = useState([8])
-  const [style, setStyle] = useState('minimal')
-  const [tone, setTone] = useState('professional')
-  const [layout, setLayout] = useState('balanced')
   const [activeSlideIndex, setActiveSlideIndex] = useState(0)
   const [showSettings, setShowSettings] = useState(false)
-  const [isFullscreen, setIsFullscreen] = useState(false)
   const [showSlideshow, setShowSlideshow] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
 
-  useEffect(() => {
-    if (!data) return
-    setTitle(data.title)
-    setPrompt(data.prompt)
-    setSlideCount([data.slideCount])
-    setStyle(data.style)
-    setTone(data.tone)
-    setLayout(data.layout)
-  }, [data])
-
-  const updateMut = useMutation({
-    mutationFn: () =>
-      updatePresentation({
-        data: {
-          id: presentationId,
-          title,
-          prompt,
-          slideCount: slideCount[0],
-          style: style as (typeof SLIDE_STYLES)[number]['value'],
-          tone: tone as (typeof TONE_OPTIONS)[number]['value'],
-          layout: layout as (typeof LAYOUT_OPTIONS)[number]['value'],
-        },
-      }),
-    onSuccess: () => {
-      toast.success('Presentation saved')
-      queryClient.invalidateQueries({ queryKey: presentationQueryKeys.list() })
-      queryClient.invalidateQueries({
-        queryKey: presentationQueryKeys.detail(presentationId),
-      })
-    },
-    onError: (e) => {
-      toast.error(e instanceof Error ? e.message : 'Could not save')
-    },
+  const {
+    query,
+    slides,
+    isGenerating,
+    updatedLabel,
+    form,
+    setForm,
+    updateMut,
+    regenerateMut,
+    deleteMut,
+  } = usePresentationDetail(presentationId, {
+    onDeleted: () => navigate({ to: '/' }),
   })
 
-  const regenerateMut = useMutation({
-    mutationFn: () => regeneratePresentation({ data: { id: presentationId } }),
-    onSuccess: () => {
-      toast.success('Regenerating slides…')
-      queryClient.invalidateQueries({
-        queryKey: presentationQueryKeys.detail(presentationId),
-      })
-    },
-    onError: (e) => {
-      toast.error(e instanceof Error ? e.message : 'Could not regenerate')
-    },
-  })
-
-  const deleteMut = useMutation({
-    mutationFn: () => deletePresentation({ data: { id: presentationId } }),
-    onSuccess: () => {
-      toast.success('Presentation deleted')
-      queryClient.invalidateQueries({ queryKey: presentationQueryKeys.list() })
-      queryClient.removeQueries({
-        queryKey: presentationQueryKeys.detail(presentationId),
-      })
-      navigate({ to: '/' })
-    },
-    onError: (e) => {
-      toast.error(e instanceof Error ? e.message : 'Could not delete')
-    },
-  })
-
-  const handleFullscreen = useCallback(async () => {
-    const elem = document.getElementById('slide-preview-container')
-    if (!elem) return
-
-    if (!document.fullscreenElement) {
-      await elem.requestFullscreen()
-      setIsFullscreen(true)
-    } else {
-      await document.exitFullscreen()
-      setIsFullscreen(false)
-    }
-  }, [])
+  const { isFullscreen, toggleFullscreen } = useFullscreen(
+    'slide-preview-container',
+  )
 
   const handleExportPptx = useCallback(async () => {
+    const data = query.data
     if (!data) return
-    const slidesToExport = data.slides ?? []
+    const slidesToExport = slides
     if (slidesToExport.length === 0) return
 
     setIsExporting(true)
@@ -184,18 +114,9 @@ function PresentationDetailPage() {
     } finally {
       setIsExporting(false)
     }
-  }, [data])
+  }, [query.data, slides])
 
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement)
-    }
-    document.addEventListener('fullscreenchange', handleFullscreenChange)
-    return () =>
-      document.removeEventListener('fullscreenchange', handleFullscreenChange)
-  }, [])
-
-  if (isPending) {
+  if (query.isPending) {
     return (
       <main className="min-h-screen pt-24 pb-12 px-4">
         <div className="max-w-6xl mx-auto text-muted-foreground">
@@ -205,7 +126,8 @@ function PresentationDetailPage() {
     )
   }
 
-  if (isError || !data) {
+  if (query.isError) {
+    const error = query.error
     return (
       <main className="min-h-screen pt-24 pb-12 px-4">
         <div className="max-w-6xl mx-auto space-y-4">
@@ -220,14 +142,9 @@ function PresentationDetailPage() {
     )
   }
 
+  const data = query.data
   const thumb = presentationThumbnailUrl(data.id)
-  const updatedLabel = new Date(data.updatedAt).toLocaleString(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  })
-  const slides = data.slides ?? []
-  const activeSlide = slides[activeSlideIndex]
-  const isGenerating = data.status === 'GENERATING'
+  const activeSlide = slides.at(activeSlideIndex)
 
   return (
     <main className="min-h-screen pt-24 pb-12 px-4">
@@ -327,8 +244,13 @@ function PresentationDetailPage() {
                   </Label>
                   <input
                     id="pres-title"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
+                    value={form.title}
+                    onChange={(e) =>
+                      setForm((s) => ({
+                        ...s,
+                        title: e.target.value,
+                      }))
+                    }
                     className="flex h-10 w-full rounded-xl border border-border/50 bg-background/50 px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
                   />
                 </div>
@@ -336,8 +258,13 @@ function PresentationDetailPage() {
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Prompt</Label>
                   <Textarea
-                    value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
+                    value={form.prompt}
+                    onChange={(e) =>
+                      setForm((s) => ({
+                        ...s,
+                        prompt: e.target.value,
+                      }))
+                    }
                     className="min-h-[120px] text-sm bg-background/50 border-border/50 rounded-xl resize-y"
                   />
                 </div>
@@ -345,11 +272,16 @@ function PresentationDetailPage() {
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">
-                      Slides: {slideCount[0]}
+                      Slides: {form.slideCount}
                     </Label>
                     <Slider
-                      value={slideCount}
-                      onValueChange={setSlideCount}
+                      value={[form.slideCount]}
+                      onValueChange={([v]) =>
+                        setForm((s) => ({
+                          ...s,
+                          slideCount: v,
+                        }))
+                      }
                       min={3}
                       max={20}
                       step={1}
@@ -358,7 +290,15 @@ function PresentationDetailPage() {
                   </div>
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Style</Label>
-                    <Select value={style} onValueChange={setStyle}>
+                    <Select
+                      value={form.style}
+                      onValueChange={(value) =>
+                        setForm((s) => ({
+                          ...s,
+                          style: value as (typeof SLIDE_STYLES)[number]['value'],
+                        }))
+                      }
+                    >
                       <SelectTrigger className="bg-background/50 border-border/50 rounded-xl">
                         <SelectValue />
                       </SelectTrigger>
@@ -373,7 +313,15 @@ function PresentationDetailPage() {
                   </div>
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Tone</Label>
-                    <Select value={tone} onValueChange={setTone}>
+                    <Select
+                      value={form.tone}
+                      onValueChange={(value) =>
+                        setForm((s) => ({
+                          ...s,
+                          tone: value as (typeof TONE_OPTIONS)[number]['value'],
+                        }))
+                      }
+                    >
                       <SelectTrigger className="bg-background/50 border-border/50 rounded-xl">
                         <SelectValue />
                       </SelectTrigger>
@@ -388,7 +336,15 @@ function PresentationDetailPage() {
                   </div>
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Layout</Label>
-                    <Select value={layout} onValueChange={setLayout}>
+                    <Select
+                      value={form.layout}
+                      onValueChange={(value) =>
+                        setForm((s) => ({
+                          ...s,
+                          layout: value as (typeof LAYOUT_OPTIONS)[number]['value'],
+                        }))
+                      }
+                    >
                       <SelectTrigger className="bg-background/50 border-border/50 rounded-xl">
                         <SelectValue />
                       </SelectTrigger>
@@ -404,32 +360,48 @@ function PresentationDetailPage() {
                 </div>
 
                 <div className="flex flex-wrap justify-between gap-3 pt-2">
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    className="rounded-xl gap-2"
-                    disabled={deleteMut.isPending}
-                    onClick={() => {
-                      if (
-                        typeof window !== 'undefined' &&
-                        window.confirm(
-                          'Delete this presentation? This cannot be undone.',
-                        )
-                      ) {
-                        deleteMut.mutate()
-                      }
-                    }}
-                  >
-                    <Trash2 className="size-4" />
-                    Delete
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="rounded-xl gap-2"
+                        disabled={deleteMut.isPending}
+                      >
+                        <Trash2 className="size-4" />
+                        Delete
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="glass">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete presentation?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone. This will permanently
+                          delete your presentation and all its slides.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel className="rounded-xl">
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          onClick={() => deleteMut.mutate()}
+                        >
+                          {deleteMut.isPending ? 'Deleting…' : 'Delete'}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                   <Button
                     type="button"
                     size="sm"
                     className="rounded-xl gap-2"
                     disabled={
-                      updateMut.isPending || !title.trim() || !prompt.trim()
+                      updateMut.isPending ||
+                      !form.title.trim() ||
+                      !form.prompt.trim()
                     }
                     onClick={() => updateMut.mutate()}
                   >
@@ -450,7 +422,7 @@ function PresentationDetailPage() {
                     className={`absolute top-3 right-3 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity ${
                       isFullscreen ? 'opacity-100' : ''
                     }`}
-                    onClick={handleFullscreen}
+                    onClick={toggleFullscreen}
                   >
                     <Maximize className="size-4" />
                   </Button>

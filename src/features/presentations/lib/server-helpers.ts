@@ -15,6 +15,6 @@ export function deriveTitle(prompt: string) {
 export async function requirePresentationUserId() {
   const headers = getRequestHeaders()
   const session = await auth.api.getSession({ headers })
-  if (!session?.user?.id) throw new Error('Unauthorized')
+  if (!session?.user.id) throw new Error('Unauthorized')
   return session.user.id
 }

@@ -11,7 +11,13 @@ export type {
   SlideStyle,
   SlideTone,
 } from './constants/presentation-options'
+export {
+  PRESENTATION_TEMPLATES,
+  type PresentationTemplate,
+} from './constants/presentation-templates'
 export { presentationQueryKeys } from './hooks/query-keys'
+export { useFullscreen } from './hooks/use-fullscreen'
+export { usePresentationDetail } from './hooks/use-presentation-detail'
 export { exportToPptx } from './lib/export-pptx'
 export type { Presentation } from './types/presentation.types'
 export { presentationThumbnailUrl } from './utils/thumbnail-url'

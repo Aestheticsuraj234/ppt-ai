@@ -5,16 +5,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
-function toInternalPath(maybeUrl: string | undefined) {
-  if (!maybeUrl) return null
-  if (maybeUrl.startsWith('/')) return maybeUrl
-  try {
-    const url = new URL(maybeUrl)
-    return `${url.pathname}${url.search}${url.hash}`
-  } catch {
-    return null
-  }
-}
+import { toInternalPath } from '#/lib/auth-redirect'
 
 export default function LoginForm({ redirectTo }: { redirectTo?: string }) {
   const navigate = useNavigate()
@@ -31,7 +22,7 @@ export default function LoginForm({ redirectTo }: { redirectTo?: string }) {
           onSuccess: () => {
             toast.success('Logged in successfully!')
             const internalRedirect = toInternalPath(redirectTo)
-            navigate({ to: internalRedirect ?? '/' })
+            navigate({ to: (internalRedirect ?? '/') as any })
           },
           onError: ({ error }) => {
             toast.error(error.message || 'Failed to login. Please try again.')

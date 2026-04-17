@@ -90,11 +90,13 @@ export default function Navbar() {
                   >
                     <Avatar className="size-9 border-2 border-primary/30">
                       <AvatarImage
-                        src={session.user.image ?? undefined}
-                        alt={session.user.name ?? 'User'}
+                        src={session.user.image}
+                        alt={session.user.name}
                       />
                       <AvatarFallback className="bg-primary/10 text-primary font-medium">
-                        {session.user.name?.charAt(0).toUpperCase() ?? (
+                        {session.user.name ? (
+                          session.user.name.charAt(0).toUpperCase()
+                        ) : (
                           <User className="size-4" />
                         )}
                       </AvatarFallback>

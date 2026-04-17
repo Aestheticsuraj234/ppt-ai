@@ -44,9 +44,7 @@ export const updatePresentation = createServerFn({ method: 'POST' })
       where: { id, userId },
     })
     if (!existing) throw new Error('Not found')
-    const updateData = Object.fromEntries(
-      Object.entries(patch).filter(([, v]) => v !== undefined),
-    )
+    const updateData = patch
     return prisma.presentation.update({
       where: { id },
       data: updateData,

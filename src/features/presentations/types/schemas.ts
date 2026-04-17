@@ -44,7 +44,7 @@ export const updatePresentationInputSchema = z
   .refine(
     (data) => {
       const { id: _id, ...rest } = data
-      return Object.values(rest).some((v) => v !== undefined)
+      return Object.keys(rest).length > 0
     },
     { message: 'At least one field is required to update' },
   )
