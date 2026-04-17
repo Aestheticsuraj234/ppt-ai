@@ -3,7 +3,7 @@ import ImageKit from '@imagekit/nodejs'
 export const imagekit = new ImageKit({
   publicKey: process.env.IMAGEKIT_PUBLIC_KEY!,
   privateKey: process.env.IMAGEKIT_PRIVATE_KEY!,
-  urlEndpoint: 'https://ik.imagekit.io/pptai',
+  urlEndpoint: process.env.IMAGEKIT_BASE_URL!,
 })
 
 export async function uploadImageFromUrl(
