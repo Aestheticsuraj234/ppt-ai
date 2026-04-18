@@ -194,7 +194,3 @@ pnpm check
 - [AI SDK](https://ai-sdk.dev/)
 
 ---
-
-## License
-
-Private project (`"private": true` in `package.json`). Adjust this section if you open-source the repo.
