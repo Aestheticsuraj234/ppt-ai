@@ -34,7 +34,7 @@ export function usePresentationDetail(
     refetchInterval: (q) =>
       q.state.data?.status === 'GENERATING' ? 3000 : false,
   })
-
+ 
   const [form, setForm] = useState<SettingsForm>({
     title: '',
     prompt: '',

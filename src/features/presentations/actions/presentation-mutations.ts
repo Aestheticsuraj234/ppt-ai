@@ -82,5 +82,5 @@ export const regeneratePresentation = createServerFn({ method: 'POST' })
       data: { presentationId: data.id },
     })
 
-    return { ok: true as const }
+    
   })

@@ -58,7 +58,7 @@ function HomePage() {
     content: '',
     slideCount: 8,
     style: 'minimal',
-    tone: 'professional',
+    tone: 'formal',
     layout: 'balanced',
   })
 
